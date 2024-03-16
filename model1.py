@@ -1,3 +1,7 @@
+#
+# baseline model SVM model
+#
+
 import json
 import pandas as pd
 import re
@@ -94,7 +98,7 @@ print("Test Micro F1:", test_f1_micro)
 
 
 # Step 7: Output Generation
-output_file = 'Results.jsonl'
+output_file = 'Results_model1.jsonl'
 with open(output_file, 'w') as file:
     for idx, label in zip(test_data['id'], test_predictions):
         file.write(json.dumps({'id': idx, 'label': int(label)}) + '\n')
@@ -106,7 +110,7 @@ with open(output_file, 'w') as file:
 
 # Step 9: Scoring
 # Use the provided scorer script to compute scores
-# python scorer.py --gold_file_path .\data\SubtaskA\subtaskA_monolingual_gold.jsonl --pred_file_path .\Results.jsonl
+# python scorer.py --gold_file_path .\data\SubtaskA\subtaskA_monolingual_gold.jsonl --pred_file_path .\Results_model1.jsonl
 
 # Step 10: Report
 # Write a report summarizing your approach, models used, evaluation results, etc.

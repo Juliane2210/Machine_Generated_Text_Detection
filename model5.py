@@ -1,10 +1,7 @@
-import json
-import pandas as pd
-import re
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, f1_score
+#
+# Bert Model
+#
+
 from datasets import Dataset
 import pandas as pd
 import evaluate
@@ -15,15 +12,14 @@ from sklearn.model_selection import train_test_split
 from scipy.special import softmax
 import argparse
 import logging
-
-# Step 1: Data Loading
+import json
 
 
 def preprocess_function(examples, **fn_kwargs):
     return fn_kwargs['tokenizer'](examples["text"], truncation=True)
 
 
-def get_data(train_path, test_path, random_seed):
+def get_data(train_path, val_path, test_path, random_seed):
     """
     function to read dataframe with columns
     """
@@ -31,11 +27,9 @@ def get_data(train_path, test_path, random_seed):
     train_df = pd.read_json(train_path, lines=True)
     test_df = pd.read_json(test_path, lines=True)
 
-    train_df, val_df = train_test_split(
-        train_df, test_size=0.2, stratify=train_df['label'], random_state=random_seed)
+    val_df = pd.read_json(val_path, lines=True)
 
     return train_df, val_df, test_df
-# Step 2: Data Preprocessing
 
 
 def compute_metrics(eval_pred):
@@ -75,13 +69,11 @@ def fine_tune(train_df, valid_df, checkpoints_path, id2label, label2id, model):
 
     # create Trainer
     training_args = TrainingArguments(
-
-
         output_dir=checkpoints_path,
         learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=3,
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=64,
+        num_train_epochs=2,
         weight_decay=0.01,
         evaluation_strategy="epoch",
         save_strategy="epoch",
@@ -134,26 +126,34 @@ def test(test_df, model_path, id2label, label2id):
     )
     # get logits from predictions and evaluate results using classification report
     predictions = trainer.predict(tokenized_test_dataset)
-    prob_pred = softmax(predictions.predictions, axis=-1)
+    # prob_pred = softmax(predictions.predictions, axis=-1)
     preds = np.argmax(predictions.predictions, axis=-1)
-    metric = evaluate.load("bstrai/classification_report")
-    results = metric.compute(
-        predictions=preds, references=predictions.label_ids)
+    # metric = evaluate.load("bstrai/classification_report")
+    # results = metric.compute(
+    #     predictions=preds, references=predictions.label_ids)
 
     # return dictionary of classification report
-    return results, preds
+    return preds
 
 
 if __name__ == '__main__':
 
-    train_path = './/data//SubtaskA//min//subtaskA_train_monolingual.jsonl'
-    test_path = './/data//SubtaskA//min//subtaskA_monolingual.jsonl'
-    model = " roberta-base"
-    subtask = ""
-    prediction_path = ".//BaselineResults.jsonl"
-    subtask = "A"
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--train_file_path", "-tr", required=True, help="Path to the train file.", type=str)
+    # parser.add_argument("--test_file_path", "-t", required=True, help="Path to the test file.", type=str)
+    # parser.add_argument("--subtask", "-sb", required=True, help="Subtask (A or B).", type=str, choices=['A', 'B'])
+    # parser.add_argument("--model", "-m", required=True, help="Transformer to train and test", type=str)
+    # parser.add_argument("--prediction_file_path", "-p", required=True, help="Path where to save the prediction file.", type=str)
+
+    # args = parser.parse_args()
 
     random_seed = 0
+    train_path = './/data//SubtaskA//min//subtaskA_train_monolingual.jsonl'
+    val_path = './/data//SubtaskA//min//subtaskA_dev_monolingual.jsonl'
+    test_path = './/data//SubtaskA//min//subtaskA_monolingual.jsonl'
+    model = 'google-bert/bert-base-cased'
+    prediction_path = ".//Results_model5_1.jsonl"
+    subtask = "A"
 
     if not os.path.exists(train_path):
         logging.error("File doesnt exists: {}".format(train_path))
@@ -180,22 +180,23 @@ if __name__ == '__main__':
     set_seed(random_seed)
 
     # get data for train/dev/test sets
-    train_df, valid_df, test_df = get_data(train_path, test_path, random_seed)
+    train_df, valid_df, test_df = get_data(
+        train_path, val_path, test_path, random_seed)
 
     # train detector model
     fine_tune(train_df, valid_df,
               f"{model}/subtask{subtask}/{random_seed}", id2label, label2id, model)
 
     # test detector model
-    results, predictions = test(
+    predictions = test(
         test_df, f"{model}/subtask{subtask}/{random_seed}/best/", id2label, label2id)
 
-    logging.info(results)
+    # logging.info(results)
     predictions_df = pd.DataFrame({'id': test_df['id'], 'label': predictions})
     predictions_df.to_json(prediction_path, lines=True, orient='records')
 
     # Step 7: Output Generation
-    output_file = 'Results_baseline1.jsonl'
+    output_file = 'Results_model5.jsonl'
     with open(output_file, 'w') as file:
         for idx, label in zip(test_df['id'], predictions):
             file.write(json.dumps({'id': idx, 'label': int(label)}) + '\n')
@@ -207,7 +208,7 @@ if __name__ == '__main__':
 
 # Step 9: Scoring
 # Use the provided scorer script to compute scores
-# python scorer.py --gold_file_path .\data\SubtaskA\subtaskA_monolingual_gold.jsonl --pred_file_path .\Results.jsonl
+# python scorer.py --gold_file_path .\data\SubtaskA\subtaskA_monolingual_gold.jsonl --pred_file_path .\Results_model5.jsonl
 
 # Step 10: Report
 # Write a report summarizing your approach, models used, evaluation results, etc.
