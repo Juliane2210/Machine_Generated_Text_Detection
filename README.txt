@@ -1,5 +1,5 @@
 #
-# Juliane Bruck 8297746
+# Juliane Bruck 
 #
 
 ASSIGNMENT #2
@@ -131,6 +131,7 @@ INFO : macro-F1=0.36384 micro-F1=0.40789        accuracy=0.40789
 
 
      
+
 
 
 
